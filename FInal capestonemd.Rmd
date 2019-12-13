@@ -1,0 +1,258 @@
+---
+title: "What matters"
+author: "Douglas"
+date: "11/25/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r message=FALSE, warning=FALSE}
+library(readxl)
+library(tidyverse)
+library(leaflet)
+
+pvr <- read_excel("/Users/dearm/Documents/police-violencereport-2017.xlsx")
+
+```
+
+
+
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **Introduction **
+
+All 50 states and Washington DC fail to comply with international law and standards on the use of lethal force by law enforcement officers;
+Nine states and Washington DC currently have no laws on use of lethal force by law enforcement officers;
+thirteen states have laws that do not even comply with the lower standards set by US constitutional law on use of lethal force by law enforcement officers (info taken from https://www.amnestyusa.org/files/aiusa_deadlyforcereportjune2015.pdf). Recently, police use of deadly force has been a topic of discussion. The discussion in America often points to race being a key factor. 
+
+
+## **The Data **
+The data set that I will be pulling from is a study done on mapping police violence, using data collected from 2017, found at <https://policeviolencereport.org/>.
+
+
+
+```{r pvr, message=FALSE, warning=FALSE}
+library(knitr)
+library(kableExtra)
+tab<- head(pvr, 10)
+kable(tab[,1:5])
+```
+
+## **Cleaning the data **
+There were some columns that I opted to remove, such as the weblink, victim's name, and 3 others.  I thought that creating a new column called, "address" would help consolidate the data, rather than have it spread over multiple columns. The column names were a bit cumbersome, with spaces, underscores and punctuation, so many were abbreviated to be more manageable, while others were cleaned up to make the data easier to work with.  Consistency was needed across the variables so they were changed to lowercase and other inconsistencies would be accurately recognized, so that when manipulated they showed a more accurate representation. There were several columns that contained information that wasn't being used for analysis, so those columns were removed. Doing so allowed for an easier manipulation and overview of the data.
+
+```{r,message=FALSE, warning=FALSE}
+#removing unwanted columns
+pvr1 <- pvr[,-c(1,5,11,15,30)]
+
+```
+
+In a study conducted by Amnesty International<https://www.theguardian.com/us-news/2015/jun/18/us-states-police-use-of-force-standards-amnesty>, they found, "Every state in the US fails to comply with international standards on the lethal use of force by law enforcement officers, according to a report by Amnesty International USA, which also says 13 US states fall beneath even lower legal standards enshrined in US constitutional law and that nine states currently have no laws at all to deal with the issue."  Looking at the states individually didn't reveal any obvious regional trends, even when taking into consideration varying lethal force laws, or lack there of. 
+
+
+
+
+
+## **Where have most instances taken place?**
+```{r,fig.height=10, warning=FALSE, message=FALSE}
+#glance at region
+pvr1 %>% 
+  count(State) %>% 
+  arrange(desc(n)) %>% 
+ggplot(aes(x =reorder(State,-n), y = n))+
+  geom_bar(stat = 'identity')+
+  coord_flip()
+  
+  
+
+
+
+
+
+#combine columns for address
+pvr1<- unite(pvr1, Address, c('Street Address of Incident', 'City', 'State', 'Zipcode'), sep = ' ', remove = TRUE)
+pvr1 <-pvr1[,-c(14)]
+
+#renaming cols
+colnames(pvr1) <- c("Vage","Vgen", "Vrace","date", "Address", "Agency","COD","ChargesO","Mental","Unarmed","Allwep","Allthreat","Fleeing","Allcrime", "Suspoff","Pname","Prace",  "Years", "Prevsht", "Time", "Video")
+#manipulating variables for possible comparision
+pvr1$fleeing <- ifelse(pvr1$'Fleeing'%in% c("Not fleeing"),
+                       "Not fleeing",
+                       "Fleeing")
+
+
+
+pvr1$Suspoff<- tolower(pvr1$Suspoff)
+pvr1$Vrace<- tolower(pvr1$Vrace)
+
+pvr1$Vage <- ifelse(pvr1$Vage == "Unknown", NA, pvr1$Vage)
+pvr1$Vage <- ifelse(pvr1$Vage == "40s", 45, pvr1$Vage)
+pvr1$Vage<- as.numeric(pvr1$Vage)
+
+tab<- head(pvr1, 10)
+kable(tab[,2:7])
+
+
+```
+
+
+
+ "In 20 states it is legally permissible for law enforcement officers to employ lethal force against an individual attempting to escape prison or jail, even if they pose no threat." There are only 4 states that permit deadly force AFTER all other reasonable efforts have been exhausted. Of these 4 states, only 1(Tennessee) accounts for more than 1% (2.5%) of all incidents in the US. California and Texas, which have the highest number of incidents do not require that any other attempt of de-escalation be made prior to use of deadly force. California, which accounts for about 16% of the data, only requires that 1 of 3 parameters be met, under very vague definitions (" when necessarily committed"), to be left up to the officer's judgement.
+ "Homicide is justifiable when committed by public officers and those acting by their command in their aid and
+assistance, either--
+1. In obedience to any judgment of a competent Court; or,
+2. When necessarily committed in overcoming actual resistance to the execution of some legal process, or in
+the discharge of any other legal duty; or,
+3. When necessarily committed in retaking felons who have been rescued or have escaped, or when necessarily committed in arresting persons charged with felony, and who are fleeing from justice or resisting such
+arrest."
+
+
+
+ Texas, representing about 7% of the data, law starts off similarly, " A peace officer, or a person acting in a peace officer’s presence and at his direction, is justified in using force
+against another when and to the degree the actor reasonably believes the force is immediately necessary to make or
+assist in making an arrest or search, or to prevent or assist in preventing escape after arrest, if, but does go on to define some degree of requirements be met before such force can be deemed warranted.  
+ The full laws can be read at <https://www.amnestyusa.org/files/aiusa_deadlyforcereportjune2015.pdf>
+ It's worth noting that California has recently tightened their laws on police use of deadly force, and they now have one of the nation’s strictest laws. It will be interesting to conduct future studies to see what impact, if any, that will have. Prior, the language stated that deadly force was justifiable was when it was deemed" reasonable" instead of "necessary".
+
+
+
+## **Plotting the data**
+
+Once the data was more manageable, I started looking for any basic correlations or easily identifiable variables of significance. The data proved to show some interesting answers to some questions that many have asked as of late. One of the most telling, in my opinion was that, given the data provided, it doesn't seem that race is as much a factor as people would argue, on the surface. 
+
+
+
+
+
+## **Looking at race**
+
+As a nation, if over 70% of the population is white, then it would be expected that the majority of victims in the data followed suit. It would also make sense then that the next largest population, (African Americans) would fill the next category, which they do.  Whether 17% of the population should account for 50% of the data in question, begs a slightly different question. Here, you start to see where an issue may lie. One point of interest is that Native Americans make up about 1/4 of the data when the suspects offense is unknown, compared to all other categories where they account for much less than that. Outside of the "unknown" group the race variation the diversity follows a consistent pattern, as stated above.  
+
+
+
+
+```{r , echo=FALSE, warning=FALSE, message=FALSE}
+library(ggplot2)
+ggplot(pvr1, aes(x = fleeing  ))+ geom_bar()+
+  facet_wrap(~ Vrace)
+
+
+```
+ 
+ 
+ The most interesting information, in my opinion, is the data that shows that individuals not fleeing are far more likely to be killed. It would be interesting if more data could be found to look deeper into that info. Of the people not fleeing, were they more confrontational? Were they compliant? It raises questions that may help get to the root of why these situations resulted in death and weren't able to be de-escalated. This, in conjunction with the fact that violent crimes, property, and health crisis, respectively make up the top 3 categories of suspected crimes, may point more to the choice of action rather than the circumstances surrounding as points of further investigation. For a suspected violent offender, someone in health crisis, and a suspected property violator to be regarded and addressed in the same manner should raise a few red flags.
+ 
+ 
+```{r, warning=FALSE, message=FALSE}
+ggplot(pvr1, aes(x = Vrace))+
+   geom_bar()+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+## **Looking closer at multiple factors**
+
+
+Taking a look at the suspected offense, or the level of threat seemed to have little impact as well. Violent offenders rank highest, then then it's interesting that 5 other groups come next with relative similar frequency(general domestic disturbance, health crisis, property, public order, and traffic related)
+
+
+
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+#better look at info
+ggplot(pvr1, aes(x = Suspoff, fill = Vrace))+
+  geom_bar(position = 'fill')+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(pvr1, aes(x = Vage))+
+   geom_histogram(binwidth = 5, color = 'black', fill = 'purple' )+
+  scale_x_continuous(breaks=seq(0,100, 5))
+
+```
+
+
+## **An overall glance of the problem**
+
+```{r, out.width="100%", warning=FALSE, message=FALSE}
+pvr2 <- read_csv("/Users/dearm/Documents/police-violence-data.csv")
+pvr2 %>% 
+  leaflet() %>% 
+  addTiles() %>% 
+  addCircleMarkers()
+
+
+
+```
+
+
+``` {r, warning=FALSE, message=FALSE}
+#creating a better map at a quick glance
+library(tigris)
+
+#creating a visual representation/comparision of the US
+df <-pvr 
+states <- geojsonio::geojson_read("https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json", what = "sp")
+
+#laying the foundation-creataing a base map
+map<-
+  leaflet() %>%
+  setView(-96, 37.8, 4) %>%
+  addProviderTiles("CartoDB")
+
+#state variable
+summary_data <-
+  pvr1 %>%
+  mutate(state = str_extract(Address, "\\b[A-Z]{2}(?=\\s+\\d{5}$)"),
+         state = ifelse(is.na(state), str_extract(Address, "\\b[A-Z]{2}(?=\\s+\\d{4}$)"), state)) %>%
+  # add state names
+  mutate(name = state.name[match(state, state.abb)]) %>%
+  count(name) %>%
+  ungroup()
+
+states <- geo_join(data_frame = summary_data, spatial_data = states, by = "name")
+
+
+#color palate
+bins <- c(0, 5, 10, 15, 20, 25, 30, 35, Inf)
+pal <- colorBin("YlOrRd", domain = states$n, bins = bins)
+
+# create popup labels
+labels <- sprintf(
+  "<strong>%s</strong><br/>%g Incidents",
+  states$name, states$n) %>%
+  lapply(htmltools::HTML)
+
+# add state colored polygons and labels to map
+map <-
+  map %>%
+  addPolygons(
+    data = states,
+    fillColor = ~pal(n),weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto"))
+
+map
+
+```
+
+
+
+## **Conclusion**
+
+I thought looking at the nation might reveal a “hotspot” of activity. Looking at this initial map, however, shows that this is a national issue, and not just a regional one. The country is peppered with instances. And of the factors looked at within this data set, the result was the same. Young black males are being killed by police at a disproportionate rate, but one could argue, so is anyone amid a health crisis or being pulled over for a traffic citation. The question continues to be why these people were killed and we keep looking for answers. Race? Economics? Environmental circumstances? If a traffic stop, violent crime, and health crisis are approached in the same manner, why are we surprised when the outcome is the same? If the option is always on the table, why are we surprised when it’s exercised? Out of the 4 states that require some other type of force be used prior to deadly force, only one state had more than 10 police related killings over the course of the year. Forced attempts at de-escalation or lack thereof stands as a consistent inferential factor. My hope is that as these studies increase, that will become more and more apparent. With such, my hope would be to present the study to the Justice Department, possibly the Special Litigation section of the Civil Rights division, along with additional studies on the alternative approaches. The hope being, that these cases would show the need for change in the current policies. The results of this would, much like this case, has the potential to show that there isn't necessarily one distinct external factor, but rather an internal one, that when addressed, could lead to a much-needed change.
